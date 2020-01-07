@@ -16,7 +16,7 @@ import (
 const ThumbSize = 128
 
 //Thumbnail creates a thumbnail from the passed file reader
-func Thumbnail(file *os.File) io.Reader {
+func Thumbnail(file *os.File) (io.Reader, *th.Source) {
 	rs := io.ReadSeeker(file)
 	var src th.Source
 	var thumb image.Image
@@ -48,7 +48,7 @@ func Thumbnail(file *os.File) io.Reader {
 		panic(err)
 	}
 	//return buffer as reader
-	return bytes.NewReader(buff.Bytes())
+	return bytes.NewReader(buff.Bytes()), &src
 }
 
 func calcRatio(dims thumbnailer.Dims) thumbnailer.Dims {
