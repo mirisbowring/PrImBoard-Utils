@@ -14,9 +14,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/bakape/thumbnailer"
 	"github.com/cheggaaa/pb"
 	ipfs "github.com/ipfs/go-ipfs-api"
-	th "github.com/mirisbowring/PrImBoard-Utils/helper/thumbnail_helper"
+	h "github.com/mirisbowring/PrImBoard-Utils/helper"
 	"golang.org/x/crypto/ssh/terminal"
 )
 
@@ -72,7 +73,11 @@ func main() {
 	//collecting files
 	var files []string
 	err := filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
-		files = append(files, path)
+		//ignore dirs
+		mode, _ := os.Stat(path)
+		if !mode.Mode().IsDir() {
+			files = append(files, path)
+		}
 		return nil
 	})
 	if err != nil {
@@ -110,33 +115,28 @@ func doMedia(files []string) {
 	// new ipfs shell
 	sh := ipfs.NewShell(cfg.IpfsNodeAPI)
 	for _, file := range files {
-		// state file infos
-		mode, err := os.Stat(file)
-		if err != nil {
-			log.Fatal(err)
-		}
-		// ignore dirs (we are adding files only)
-		if mode.Mode().IsDir() {
-			continue
-		}
 		// create file pointer
 		r, _ := os.Open(file)
-		// create thumbnail and receive pointer
-		rt, src := th.Thumbnail(r)
 		// add the file to ipfs
 		// do not use the recursive AddDir because we need to add all the files to the mongo
 		cid, err := sh.Add(r)
 		if err != nil {
 			log.Fatal(err)
 		}
+		r.Close()
+		//recreate file pointer (add is manipulating it)
+		r, _ = os.Open(file)
+		// create thumbnail and receive pointer
+		rt, src := h.Thumbnail(r)
 		// add the thumbnail to the ipfs
 		thumbCid, err := sh.Add(rt)
 		if err != nil {
 			log.Fatal(err)
 		}
+		r.Close()
 		// if successfull, create a media object with the returned ipfs url
 		var m media
-		if src.Meta != nil && src.Meta.Title != nil {
+		if (src.Meta != thumbnailer.Meta{} && src.Meta.Title != "") {
 			m.Title = src.Meta.Title
 		}
 		m.Sha1 = cid
