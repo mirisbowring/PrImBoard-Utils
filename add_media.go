@@ -111,7 +111,7 @@ func readConfig(file string) {
  * primboard api
  */
 func doMedia(files []string) {
-	bar := pb.StartNew(len(files) - 1)
+	bar := pb.StartNew(len(files))
 	// new ipfs shell
 	sh := ipfs.NewShell(cfg.IpfsNodeAPI)
 	for _, file := range files {
