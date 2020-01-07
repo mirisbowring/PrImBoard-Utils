@@ -16,6 +16,7 @@ import (
 
 	"github.com/cheggaaa/pb"
 	ipfs "github.com/ipfs/go-ipfs-api"
+	th "github.com/mirisbowring/PrImBoard-Utils/helper/thumbnail_helper"
 	"golang.org/x/crypto/ssh/terminal"
 )
 
@@ -31,7 +32,7 @@ type media struct {
 	Creator   string
 	Tags      []int32
 	Timestamp int64
-	Url       string
+	URL       string
 	URLThumb  string
 	Type      string
 	Format    string
@@ -120,17 +121,36 @@ func doMedia(files []string) {
 		}
 		// create file pointer
 		r, _ := os.Open(file)
+		// create thumbnail and receive pointer
+		rt, src := th.Thumbnail(r)
 		// add the file to ipfs
 		// do not use the recursive AddDir because we need to add all the files to the mongo
 		cid, err := sh.Add(r)
 		if err != nil {
 			log.Fatal(err)
 		}
+		// add the thumbnail to the ipfs
+		thumbCid, err := sh.Add(rt)
+		if err != nil {
+			log.Fatal(err)
+		}
 		// if successfull, create a media object with the returned ipfs url
 		var m media
+		if src.Meta != nil && src.Meta.Title != nil {
+			m.Title = src.Meta.Title
+		}
 		m.Sha1 = cid
-		m.Url = cfg.IpfsGateway + cid
-		m.Type, m.Format = getMediaInfo(file)
+		m.URL = cfg.IpfsGateway + cid
+		m.URLThumb = cfg.IpfsGateway + thumbCid
+		// eval mime to generic type
+		if src.HasVideo {
+			m.Type = "video"
+		} else if src.HasAudio {
+			m.Type = "audio"
+		} else {
+			m.Type = "image"
+		}
+		m.Format = src.Extension
 		// encode the object to json
 		b := new(bytes.Buffer)
 		json.NewEncoder(b).Encode(m)
@@ -182,38 +202,6 @@ func login() {
 		io.Copy(os.Stdout, res.Body)
 		log.Fatal("Cloud not authenitcate to server.")
 	}
-}
-
-// static fixed sized array, containing common video extensions
-var videoext = []string{
-	"avi", "flv", "m4p", "m4v", "mkv", "mp4", "mpg", "mov", "ogg", "webm", "wmv",
-}
-
-// static fixed sized array, containing common image extensions
-var imageext = []string{
-	"jpeg", "jpg", "png",
-}
-
-/**
- * getMediaInfo selects the extension of the passed file and iterates through
- * the extension arrays.
- * Returns:
- * "type" "format"
- *
- * type can be "image" and "video"
- * format can be any item in one of the extension arrays
- *
- * both strings are empty, if the extension was not found in any extension array
- */
-func getMediaInfo(file string) (string, string) {
-	ext := strings.Trim(filepath.Ext(file), ".")
-	ext = strings.ToLower(ext)
-	if isInArray(ext, &imageext) {
-		return "image", ext
-	} else if isInArray(ext, &videoext) {
-		return "video", ext
-	}
-	return "", ""
 }
 
 /**
