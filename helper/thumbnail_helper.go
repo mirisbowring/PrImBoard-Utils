@@ -1,4 +1,4 @@
-package thumbnail
+package helper
 
 import (
 	"bytes"
@@ -7,7 +7,6 @@ import (
 	"io"
 	"os"
 
-	"github.com/bakape/thumbnailer"
 	th "github.com/bakape/thumbnailer"
 	"github.com/oliamb/cutter"
 )
@@ -21,15 +20,15 @@ func Thumbnail(file *os.File) (io.Reader, *th.Source) {
 	var src th.Source
 	var thumb image.Image
 	//get original dimensions
-	ctx, _ := thumbnailer.NewFFContext(rs)
+	ctx, _ := th.NewFFContext(rs)
 	src.Dims, _ = ctx.Dims()
 	ctx.Close()
 	//calc dimension to fit smalles side to ThumbSize
-	opts := thumbnailer.Options{
+	opts := th.Options{
 		ThumbDims: calcRatio(src.Dims),
 	}
 	//thumbnail image
-	src, thumb, _ = thumbnailer.Process(rs, opts)
+	src, thumb, _ = th.Process(rs, opts)
 	//crop image to centered square
 	thumb, _ = cutter.Crop(thumb, cutter.Config{
 		Width:   1,
@@ -51,20 +50,20 @@ func Thumbnail(file *os.File) (io.Reader, *th.Source) {
 	return bytes.NewReader(buff.Bytes()), &src
 }
 
-func calcRatio(dims thumbnailer.Dims) thumbnailer.Dims {
+func calcRatio(dims th.Dims) th.Dims {
 	if dims.Width == dims.Height {
 		return dims
 	} else if dims.Width > dims.Height {
 		tmp := ThumbSize / float64(dims.Height)
 		tmp = float64(dims.Width) * tmp
-		return thumbnailer.Dims{
+		return th.Dims{
 			Width:  uint(tmp),
 			Height: ThumbSize + 2,
 		}
 	} else {
 		tmp := ThumbSize / float64(dims.Width)
 		tmp = float64(dims.Height) * tmp
-		return thumbnailer.Dims{
+		return th.Dims{
 			Width:  ThumbSize + 2,
 			Height: uint(tmp),
 		}
