@@ -47,6 +47,9 @@ type user struct {
 var u user
 var cfg config
 
+// authCookie stores the temporal cookie object
+var authCookie *http.Cookie
+
 func main() {
 	// check if at least one argument has been passed
 	if len(os.Args) < 2 {
@@ -155,14 +158,25 @@ func doMedia(files []string) {
 		b := new(bytes.Buffer)
 		json.NewEncoder(b).Encode(m)
 		// post the object to the api
-		res, _ := http.Post("http://"+cfg.PrimboardHost+"/api/v1/media", "application/json", b)
-		if res.StatusCode != 201 {
-			log.Fatal(res.StatusCode)
-		}
-		// step forward if nothing went wrong
+		post("http://"+cfg.PrimboardHost+"/api/v1/media", "application/json", b)
 		bar.Increment()
 	}
 	bar.Finish()
+}
+
+// post creates a http client and posts the data with the auth cookie to the api
+func post(url string, contentType string, body io.Reader) {
+	client := &http.Client{}
+	req, _ := http.NewRequest("POST", url, body)
+	req.Header.Set("Content-Type", contentType)
+	// set cookie
+	req.AddCookie(authCookie)
+	res, _ := client.Do(req)
+	if res.StatusCode != 201 {
+		log.Fatal(res.StatusCode)
+	} else {
+		readSessionCookie(res)
+	}
 }
 
 /**
@@ -202,6 +216,19 @@ func login() {
 		io.Copy(os.Stdout, res.Body)
 		log.Fatal("Cloud not authenitcate to server.")
 	}
+	readSessionCookie(res)
+}
+
+// readSessionCookie reads the auth cookie from the response
+func readSessionCookie(r *http.Response) {
+	cookies := r.Cookies()
+	for _, cookie := range cookies {
+		if cookie.Name == "stoken" {
+			authCookie = cookie
+			return
+		}
+	}
+	log.Fatal("Could not read authentication token!")
 }
 
 /**
